@@ -1,0 +1,33 @@
+Learning task
+-------------
+
+5 blocks (diff. skin sites)
+	16 trials/block
+Gen task
+--------
+
+5 blocks
+	18 trials/block
+	1 gen stimulus/block (18 genStim total)
+
+study 2019 (social)
+
+protocol:
+-social cue + CS + EXP rating +(jit 2-4s) + PAIN (2sec) + (jit 4-8s) + PainRep (5sec) +(3-8sec entre trial)
+
+Learning
+-------
+
+6 runs ( 16 trials each) = 96 trials/subj
+- right calf
+
+DATA
+
+SCEBLmri_data.exp_mfpe ??
+
+### Questions for internship
+
+1) Are learning effects and expectations have the same effect?
+	Are (implicit/explicit) expectations the building block of 
+	social pain modulation (placebo, suggestion, vicarious..)?
+	
