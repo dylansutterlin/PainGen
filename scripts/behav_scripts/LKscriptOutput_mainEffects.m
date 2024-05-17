@@ -5,16 +5,19 @@
 clc
 close all
 clear all
+
 projectDir = '/home/dsutterlin/projects/genPain/';
 dataDir = fullfile(projectDir, 'DATA/Behavioral/')
 saveDir = fullfile(projectDir, 'results/behavioral')
+addpath(genpath(fullfile(projectDir, 'Toolboxes/')));
 
 cd (saveDir);
 load finalPreproc_simGen_data.mat SCEBLmri_gendata
 %load simrate.mat
 load SCEBLmri_learndata_FINAL_N36.mat SCEBLmri_data
 %load SCEBLmri_data_gen36.mat
-gdata_df = readtable('SCEBLmri_Gendata_TxT_N36.csv')
+gdata_df = readtable('SCEBLmri_Gendata_TxT_N36.csv');
+ldata_df = readtable('SCEBLmri_Learndata_TxT_N36.csv');
 
 % loading and rename learn and gen data for regression
 ldata = SCEBLmri_data;
@@ -64,23 +67,69 @@ set(gca, 'XTick', [-.5 .5], 'XLim', [-.6 .6], 'XTickLabel', {'CSLow' 'CSHigh'});
 %Apply filter on trials to keep only trials with medium temp.
 for sub = 1:numel(subjects)
     mask = ldata.temp{sub} == 49;
-    ldata.cues49deg{sub} = ldata.cues{sub}(mask)
-    ldata.pain49deg{sub} = ldata.pain{sub}(mask)
+    ldata.cues49deg{sub} = ldata.cues{sub}(mask);
+    ldata.pain49deg{sub} = ldata.pain{sub}(mask);
 end
 Y_name = 'pain';
 X_var_names = {'Cues from medium pain trials'};
 X2_names = {'2nd-level Intercept (average within-person effects)'};
-
+X2 = learn_beta
 cuePain = glmfit_multilevel(ldata.pain49deg, ldata.cues49deg, [], 'names', X_var_names, 'beta_names', X2_names, 'weighted')
 create_figure('2nd level stats');
 barplot_columns(cuePain.first_level.beta', 'names', cuePain.inputOptions.names, 'colors', effectcolors, 'nofigure');
 ylabel(Y_name);
 title('Individual within-person scores');
 drawnow, snapnow
+
+% Colors gradient as a function of learning
+min_beta = min(learn_beta);
+max_beta = max(learn_beta);
+color_scale = colormap(parula); % Using parula colormap for a smooth transition from light yellow to orange
+normalized_beta = (learn_beta - min_beta) / (max_beta - min_beta);
+color_indices = ceil(normalized_beta * (size(color_scale, 1) - 1)) + 1;
+rgb_colors = cell(size(color_indices));
+for i = 1:length(color_indices)
+    rgb_colors{i} = color_scale(color_indices(i), :);
+end
+min_beta = round(min(learn_beta));
+max_beta = round(max(learn_beta));
+
+% Multiline with bar plots for mean CS -----------
 create_figure('1st level effect');
-line_plot_multisubject(ldata.cues, ldata.pain);
+line_plot_multisubject(ldata.cues, ldata.pain,'colors', rgb_colors, 'exclude_low_range_Y');
 set(gca, 'XTick', [-.5 .5], 'XLim', [-.6 .6], 'XTickLabel', {'CSLow' 'CSHigh'});
+hold on;
+conditions = [-1, 1]; % Unique conditions
+mean_pain49 = zeros(1, length(conditions)); % Preallocate mean pain array
+filtered_49 = (ldata_df.temp == 49);
+% Calculate mean pain scores for each condition
+for i = 1:length(conditions)
+    condition_indices = (ldata_df.cues == conditions(i)) & filtered_49;
+    mean_pain49(i) = nanmean(ldata_df.pain(condition_indices));
+end
+% Add bar plots of the mean pain scores
+bar_handle = bar(conditions, mean_pain49);
+bar_handle.FaceColor = [0, 0.4470, 0.7410]; % Light blue color
+bar_handle.FaceAlpha = 0.5; % Transparency
+ylim([0 80]);
+xlabel('Conditioned cue conditions');
+ylabel('Pain score');
+title('Conditioned cues effect on pain');
+
+hLegend = legend('Individual Slopes');
+hold on;
+p = patch(NaN, NaN, [0, 0.4470, 0.7410], 'FaceAlpha', 0.5);
+set(get(get(p, 'Annotation'), 'LegendInformation'), 'IconDisplayStyle', 'on');
+colormap(parula);
+cbar = colorbar('Location', 'eastoutside');
+cbar.Ticks = linspace(0, 1, 10);
+rounded_tick_labels = round(linspace(min_beta, max_beta, 10)); % Round the tick labels
+cbar.TickLabels = num2cell(rounded_tick_labels);
+cbar.Label.String = 'Explicit learning';
+hold off;
+
 % ! MAin effect sig.
+
 
 % PAIN ~ CUES * EXP !! NEED fitlme()                    
 %==================()
@@ -151,7 +200,7 @@ line_plot_multisubject(ldata.cues, ldata.pain);
 set(gca, 'XTick', [-.5 .5], 'XLim', [-.6 .6], 'XTickLabel', {'CSLow' 'CSHigh'});
 
 
-% GENERALIZATION TASK
+%% GENERALIZATION TASK
 %====================
 
 plot_correlation_matrix(gdata_df, 'names', gdata_df.Properties.VariableNames)
@@ -177,16 +226,16 @@ set(gca, 'XTick', [-.5 .5], 'XLim', [-.6 .6], 'XTickLabel', {'CSLow' 'CSHigh'});
 % GENERALIZATION EFFECTS ~ Exp
 % Create a scatter plot
 figure;
-scatter(learn_beta, gen_beta);
+scatter(learn_beta, gen_beta, "filled");
 xlabel('Explicit Learning (beta)');
 ylabel('Generalization (beta)');
-title('Expectation betas ~ CS effect on pain betas');
+title('Generalization effect in relation to explicit expectations');
 hold on;
 lsline;
 hold off;
 [r, p] = corr(learn_beta, gen_beta);
-text(0.5, 3, sprintf('Correlation: %.2f', r), 'FontSize', 12);
-text(0.5, 2.5, sprintf('P-value: %.4f', p), 'FontSize', 12, 'Color', 'red');
+annotation('textbox', [0.62, 0.15, 0.1, 0.1], 'String', sprintf('Pearson r = : %.2f', r), 'FontSize', 12, 'EdgeColor', 'none');
+annotation('textbox', [0.62, 0.08, 0.1, 0.1], 'String', sprintf('p = : %.4f', p), 'FontSize', 12, 'EdgeColor', 'none');
 
 % Learners only
 Y_name = 'pain';
@@ -198,6 +247,52 @@ gen_beta = genPain.first_level.beta(2,:)';
 create_figure('2nd level stats');
 barplot_columns(genPain.first_level.beta', 'names', genPain.inputOptions.names, 'colors', effectcolors, 'nofigure');
 ylabel(Y_name);
+
+% ---------------
+% Gen cues model with second level expectations
+X_names = {'cscat'};
+X2 = [learn_beta];
+genPain = glmfit_multilevel(gdata.pain, gdata.cscat, X2, 'names', X_names, 'beta_names', X2_names, 'weighted','boot', 'plot')
+create_figure('2nd level stats');
+barplot_columns(genPain.Y_star, 'names', {'Intercept', 'cscat'}, 'colors', effectcolors, 'nofigure');
+ylabel(Y_name);
+title('Individual within-person scores');
+drawnow, snapnow
+
+% Multiline with bar plots for mean CS -----------
+create_figure('1st level effect');
+line_plot_multisubject(gdata.cscat, gdata.pain,'colors', rgb_colors, 'exclude_low_range_Y');
+set(gca, 'XTick', [-.5 .5], 'XLim', [-.6 .6], 'XTickLabel', {'Low pain' 'High pain'});
+hold on;
+conditions = [-1, 1]; % Unique conditions
+mean_painGen = zeros(1, length(conditions)); % Preallocate mean pain array
+%filtered_49 = (gdata_df.temp == 49);
+% Calculate mean pain scores for each condition
+for i = 1:length(conditions)
+    condition_indices = (gdata_df.cscat == conditions(i));
+    mean_painGen(i) = nanmean(gdata_df.pain(condition_indices));
+end
+% Add bar plots of the mean pain scores
+bar_handle = bar(conditions, mean_painGen);
+bar_handle.FaceColor = [0, 0.4470, 0.7410]; % Light blue color
+bar_handle.FaceAlpha = 0.5; % Transparency
+ylim([0 80]);
+xlabel('Generalization conditions');
+ylabel('Pain Score');
+title('Generalization cues effect on pain');
+hLegend = legend('Individual Slopes');
+hold on;
+p = patch(NaN, NaN, [0, 0.4470, 0.7410], 'FaceAlpha', 0.5);
+set(get(get(p, 'Annotation'), 'LegendInformation'), 'IconDisplayStyle', 'on');
+
+colormap(parula);
+cbar = colorbar('Location', 'eastoutside');
+cbar.Ticks = linspace(0, 1, 10);
+rounded_tick_labels = round(linspace(min_beta, max_beta, 10)); % Round the tick labels
+cbar.TickLabels = num2cell(rounded_tick_labels);
+cbar.Label.String = 'Explicit learning';
+hold off;
+
 
 %% PAIN ~ Similarity
 %==============
@@ -370,15 +465,6 @@ X_names = {'boulderLSASimr'};
 X2 = [learn_beta];
 genPain = glmfit_multilevel(gdata.pain, gdata.boulderLSASimr, X2, 'names', X_names, 'beta_names', X2_names, 'weighted','boot')
 
-% second level expectations
-X_names = {'cscat'};
-X2 = [learn_beta];
-genPain = glmfit_multilevel(gdata.pain, gdata.cscat, X2, 'names', X_names, 'beta_names', X2_names, 'weighted','boot', 'plot')
-create_figure('2nd level stats');
-barplot_columns(genPain.Y_star, 'names', {'Intercept', 'cscat'}, 'colors', effectcolors, 'nofigure');
-ylabel(Y_name);
-title('Individual within-person scores');
-drawnow, snapnow
 
 %% Correl between var
 colnames = {'blocktrial', 'condition','cscat', 'pain','empiricalSimr', 'mean_modelSimr', 'boulderLSASimr'}
