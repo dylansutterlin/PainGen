@@ -22,7 +22,30 @@ Run simModels_LearnGenData_asCSV.m
 	-  median sim matrices for different models (e.g. Landcaster, theoretical, empirical...)
 	- Save SCEBLmri_gendata.mat (with added var) to ~/results
 
-## Main effects and mediation analyses
+### Main effects
+
+run LKscriptOutput_mainEffects.m
+	-wil run multilevel GLM for learning and generalization task
+	- plot used for NeurAI congress (mean diff. of pain ~ CS) as well
+
+## fMRI analysis
+
+### QUality check and outlier removals
+run fMRI_QC.m
+	- Will perform 1)func imgs extraction, 2)vifs extractions 3)remove trials above thresh
+	- Change thresh at begining of script accordingly
+	- Will save a subject struct having subj names, vifs per trials
+		 <save ('subjectsVifs.mat', "subjects")> 
+	- vifStruct.outvifs contains vector of trials exceeding vif_thresh (1 if >, 0 if <)
+
+run run_med.m 
+	- performs data extraction, reorganize files in cell/subs, mean centering vars..
+	- removes trials for all variables for which the vifStruct.outvifs has 1 in the vector
+	- performs multilevel mediation with boot strap...
+	- change saveDir, and it will save a folder/model in saveDir
+
+run cv_pred.m
+
 
  
 ## Extract outputs from ~/results to perform main contrasts
